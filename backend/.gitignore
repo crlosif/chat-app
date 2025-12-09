@@ -1,0 +1,61 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.txt
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.bak
+*~
+.DS_Store # macOS specific
+
+# Environments
+.env
+venv/
+env/
+/site/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and temporary files
+*.log
+tmp/
+logs/
+
+# Database files (if applicable)
+*.sqlite3
+*.db
+*.db-journal
+
+# Uploaded files (if applicable)
+/uploads/
+
+# Docker related files (if applicable)
+.dockerignore
+docker-compose.yml # If you're managing a local, non-versioned config
+Dockerfile # If you're managing a local, non-versioned config
+
+# Other
+.ipynb_checkpoints/ # Jupyter notebooks
