@@ -6,6 +6,15 @@ from datetime import datetime
 
 app = FastAPI()
 
+# CORS middleware to allow frontend connections
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Connection manager to handle multiple WebSocket connections
 class ConnectionManager:
     def __init__(self):
@@ -13,14 +22,8 @@ class ConnectionManager:
         self.active_connections: Dict[WebSocket, str] = {}
     
     async def connect(self, websocket: WebSocket, username: str):
-        await websocket.accept()
-        
-        await self.broadcast({
-            "type": "join",
-            "username": username,
-            "message": f"{username} joined the chat",
-            "timestamp": datetime.now().isoformat()
-        }, exclude_websocket=websocket)
+        # Note: websocket.accept() should be called before this method
+        self.active_connections[websocket] = username
     
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -39,6 +42,7 @@ class ConnectionManager:
                 try:
                     await connection.send_text(message_json)
                 except:
+                    # Handle disconnected clients
                     pass
 
 manager = ConnectionManager()
@@ -53,6 +57,8 @@ async def health():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # Accept the WebSocket connection first
+    await websocket.accept()
     
     username = None
     try:
@@ -147,7 +153,6 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"Error: {e}")
         if websocket in manager.active_connections:
             manager.disconnect(websocket)
-
 
 if __name__ == "__main__":
     import uvicorn
