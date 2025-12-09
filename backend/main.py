@@ -51,6 +51,103 @@ async def root():
 async def health():
     return {"status": "healthy", "connections": len(manager.active_connections)}
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    
+    username = None
+    try:
+        # Wait for initial message with username
+        data = await websocket.receive_text()
+        message_data = json.loads(data)
+        
+        if message_data.get("type") == "join" and message_data.get("username"):
+            username = message_data["username"].strip()
+            
+            if not username:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Username cannot be empty"
+                }))
+                await websocket.close()
+                return
+            
+            # Check if username is already taken
+            if username in manager.active_connections.values():
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Username already taken"
+                }))
+                await websocket.close()
+                return
+            
+            # Add to active connections (accept was already called)
+            manager.active_connections[websocket] = username
+            
+            # Notify all other users that someone joined
+            await manager.broadcast({
+                "type": "join",
+                "username": username,
+                "message": f"{username} joined the chat",
+                "timestamp": datetime.now().isoformat()
+            }, exclude_websocket=websocket)
+            
+            # Send welcome message
+            await manager.send_personal_message({
+                "type": "system",
+                "message": f"Welcome to the chat, {username}!",
+                "timestamp": datetime.now().isoformat()
+            }, websocket)
+            
+            # Send list of connected users
+            users = list(manager.active_connections.values())
+            await manager.send_personal_message({
+                "type": "users",
+                "users": users,
+                "timestamp": datetime.now().isoformat()
+            }, websocket)
+            
+        else:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": "Invalid initial message. Please send username."
+            }))
+            await websocket.close()
+            return
+        
+        # Listen for messages
+        while True:
+            data = await websocket.receive_text()
+            message_data = json.loads(data)
+            
+            if message_data.get("type") == "message":
+                message_text = message_data.get("message", "").strip()
+                
+                if message_text:
+                    # Broadcast message to all users
+                    await manager.broadcast({
+                        "type": "message",
+                        "username": username,
+                        "message": message_text,
+                        "timestamp": datetime.now().isoformat()
+                    })
+    
+    except WebSocketDisconnect:
+        # User disconnected
+        if username:
+            disconnected_username = manager.disconnect(websocket)
+            if disconnected_username:
+                # Notify others that user left
+                await manager.broadcast({
+                    "type": "leave",
+                    "username": disconnected_username,
+                    "message": f"{disconnected_username} left the chat",
+                    "timestamp": datetime.now().isoformat()
+                })
+    except Exception as e:
+        print(f"Error: {e}")
+        if websocket in manager.active_connections:
+            manager.disconnect(websocket)
+
 
 if __name__ == "__main__":
     import uvicorn
