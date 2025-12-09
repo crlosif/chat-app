@@ -89,6 +89,9 @@ async def websocket_endpoint(websocket: WebSocket):
             # Add to active connections (accept was already called)
             manager.active_connections[websocket] = username
             
+            # Get updated user list
+            users = list(manager.active_connections.values())
+            
             # Notify all other users that someone joined
             await manager.broadcast({
                 "type": "join",
@@ -97,18 +100,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 "timestamp": datetime.now().isoformat()
             }, exclude_websocket=websocket)
             
-            # Send welcome message
+            # Broadcast updated user list to ALL users (including the new one)
+            await manager.broadcast({
+                "type": "users",
+                "users": users,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            # Send welcome message to the new user
             await manager.send_personal_message({
                 "type": "system",
                 "message": f"Welcome to the chat, {username}!",
-                "timestamp": datetime.now().isoformat()
-            }, websocket)
-            
-            # Send list of connected users
-            users = list(manager.active_connections.values())
-            await manager.send_personal_message({
-                "type": "users",
-                "users": users,
                 "timestamp": datetime.now().isoformat()
             }, websocket)
             
@@ -142,11 +144,21 @@ async def websocket_endpoint(websocket: WebSocket):
         if username:
             disconnected_username = manager.disconnect(websocket)
             if disconnected_username:
+                # Get updated user list after disconnect
+                users = list(manager.active_connections.values())
+                
                 # Notify others that user left
                 await manager.broadcast({
                     "type": "leave",
                     "username": disconnected_username,
                     "message": f"{disconnected_username} left the chat",
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                # Broadcast updated user list to all remaining users
+                await manager.broadcast({
+                    "type": "users",
+                    "users": users,
                     "timestamp": datetime.now().isoformat()
                 })
     except Exception as e:
